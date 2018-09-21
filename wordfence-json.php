@@ -29,11 +29,15 @@ function send_new_issues($issues, $endpoint) {
 
 function get_issues() {
     global $wpdb;
-    $all_issues = $wpdb->get_results('SELECT time, type, severity, shortMsg, LongMsg FROM wp_wfissues');
+    $all_issues = $wpdb->get_results('SELECT time, lastUpdated, type, severity, shortMsg, LongMsg FROM wp_wfIssues WHERE status = "new"');
+    if (!empty($all_issues)) {
+    	return $all_issues;
+    }
+    else {
+    	return False;
+    }
 
     // TODO: table name to variable
-    // TODO: get only new issues
-    return $all_issues;
 }
 
 function wordfence_json_check() {
@@ -42,10 +46,10 @@ function wordfence_json_check() {
 
     $report_portal = 'http://10.207.33.94/monitoring/channel/32701/'; // debug
 
-    $issues = get_issues();
-    $response = send_new_issues($issues, $report_portal);
-
-    return $response;
+    if ($issues = get_issues()) {
+	    $response = send_new_issues($issues, $report_portal);
+	    return $response;
+    }
 }
 
 
