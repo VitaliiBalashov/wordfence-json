@@ -10,7 +10,28 @@ Author URI: http://URI_Of_The_Plugin_Author
 License: A "Slug" license name e.g. GPL2
 */
 
-$table_name = 'wp_wfissues';
+global $wordfence_json_version;
+$wordfence_json_version = "1.0";
+$table_name = 'wp_wfIssues';
+
+function wordfence_json_install() {
+	global $wpdb;
+	$wf_json_tablename = $wpdb->prefix. "wfJson";
+	if ($wpdb->get_var("SHOW TABLES LIKE '$wf_json_tablename'") != $wf_json_tablename) {
+		$sql = "CREATE TABLE " . $wf_json_tablename . " (
+	        id mediumint(9) NOT NULL AUTO_INCREMENT,
+	        lastCheck bigint(11) DEFAULT '0' NOT NULL,
+	        UNIQUE KEY id (id)
+		  );";
+
+		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+		dbDelta($sql);
+
+		$wpdb->insert($wf_json_tablename, array('lastCheck'=>time() - (365*24*60*60)));
+	}
+}
+
+register_activation_hook(__FILE__,'wordfence_json_install');
 
 function send_new_issues($issues, $endpoint) {
     $args = array (
@@ -28,8 +49,18 @@ function send_new_issues($issues, $endpoint) {
 }
 
 function get_issues() {
-    global $wpdb;
-    $all_issues = $wpdb->get_results('SELECT time, lastUpdated, type, severity, shortMsg, LongMsg FROM wp_wfIssues WHERE status = "new"');
+	global $wpdb;
+	$last_check_point = $wpdb->get_var("SELECT lastCheck FROM wp_wfJson" );
+	$current_time = time();
+	$updated_last_check_point = $wpdb->update( 'wp_wfJson', array('lastCheck' => $current_time),array('ID'=>1));
+    $all_issues = $wpdb->get_results("SELECT time, lastUpdated, type, severity, shortMsg, LongMsg FROM wp_wfIssues WHERE status = 'new' AND lastUpdated BETWEEN $last_check_point AND $current_time");
+
+
+    var_dump($last_check_point);
+    var_dump($current_time);
+    var_dump($updated_last_check_point);
+    var_dump($all_issues);
+
     if (!empty($all_issues)) {
     	return $all_issues;
     }
