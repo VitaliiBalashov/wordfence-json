@@ -13,7 +13,12 @@ License: A "Slug" license name e.g. GPL2
 
 global $wordfence_json_version;
 $wordfence_json_version = "1.0";
-$table_name = 'wp_wfIssues';
+
+
+$options = array(
+	'wf_table_name' => $wpdb->prefix.'wfIssues',
+	'wfJson_table_name' => $wpdb->prefix.'wfJson',
+);
 
 function wordfence_json_install() {
 
@@ -74,19 +79,33 @@ function get_issues() {
 	 */
 
 	global $wpdb;
-	// ToDo: rewrite next line to get table name from variable
-	$last_check_point = $wpdb->get_var("SELECT lastCheck FROM wp_wfJson" );
+	global $options;
+	$last_check_point = $wpdb->get_var("SELECT 'lastCheck' FROM $options[wfJson_table_name]");
 
 	// Fixing current timestamp to next use.
 	// It prevents different timestamps in different places.
 
 	$current_time = time();
 
-	// ToDo: rewrite next line to get table name from variable
-	$wpdb->update( 'wp_wfJson', array('lastCheck' => $current_time), array('ID'=>1));
 
-	// ToDo: rewrite next line to get tablename from variable
-    $all_issues = $wpdb->get_results("SELECT time, lastUpdated, type, severity, shortMsg, LongMsg FROM wp_wfIssues WHERE status = 'new' AND lastUpdated BETWEEN $last_check_point AND $current_time");
+	$wpdb->update( $options['wfJson_table_name'], array('lastCheck' => $current_time), array('ID'=>1));
+
+    $all_issues = $wpdb->get_results(
+    	"SELECT
+ 					'time',
+ 					'lastUpdated', 
+ 					'type', 
+ 					'severity', 
+ 					'shortMsg', 
+ 					'LongMsg' 
+ 				FROM 
+ 					$options[wf_table_name] 
+ 				WHERE 
+ 					'status' = 'new' 
+ 					AND 
+ 					'lastUpdated' 
+ 					BETWEEN $last_check_point AND $current_time"
+				);
 
     // Prevent sending empty array
 
@@ -114,18 +133,19 @@ function wordfence_json_check() {
 	    $response = send_new_issues($issues, $report_portal);
 	    return $response;
     }
-    // ToDo: should the function return something in case of error?
-	// ToDo: we need to understand, how we would like to track this errors
+     /* ToDo: should the function return something in case of error?
+	 *  we need to understand, how we would like to track this errors
+     */
 
 }
 
 
-// debug purpouses, set to daily get value from user
 
-
-// ToDo: this filter should be removed when debugging will be end.
-// ToDo: Plugin can check the new issues daily or twice per day.
-// ToDo: To define it we should know, when WP admin panel using by admins/users usually.
+/* debug purpouses, set to daily get value from user
+ * ToDo: this filter should be removed when debugging will be end.
+ * Plugin can check the new issues daily or twice per day.
+ * To define it we should know, when WP admin panel using by admins/users usually.
+ */
 
 
 add_filter( 'cron_schedules', 'cron_add_one_min' );
