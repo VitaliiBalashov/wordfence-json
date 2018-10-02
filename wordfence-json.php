@@ -73,9 +73,7 @@ function send_new_issues($issues, $endpoint) {
         'body' => wp_json_encode($issues),
         'method' => 'POST'
     );
-    echo "<pre>";
-    var_dump($args);
-    echo "</pre>";
+
     $response = wp_remote_post($endpoint, $args);
 
     return $response;
@@ -102,14 +100,13 @@ function get_issues() {
 	global $wpdb;
 	global $options;
 	$last_check_point = $wpdb->get_var("SELECT lastCheck FROM $options[wfJson_table_name]");
-	var_dump($last_check_point);
 
 	// Fixing current timestamp to next use.
 	// It prevents different timestamps in different places.
 
 	$current_time = time();
 
-	//$wpdb->update( $options['wfJson_table_name'], array('lastCheck' => $current_time), array('ID'=>1));
+	$wpdb->update( $options['wfJson_table_name'], array('lastCheck' => $current_time), array('ID'=>1));
 
     $all_issues = $wpdb->get_results(
     	"SELECT
@@ -160,8 +157,7 @@ function wordfence_json_check() {
 
 }
 
-wordfence_json_check();
-
+//
 ///* debug purpouses, set to daily get value from user
 // * ToDo: this filter should be removed when debugging will be end.
 // * Plugin can check the new issues daily or twice per day.
@@ -169,22 +165,22 @@ wordfence_json_check();
 // */
 //
 //
-//add_filter( 'cron_schedules', 'cron_add_one_min' );
-//function cron_add_one_min( $schedules ) {
-//    $schedules['one_min'] = array(
-//        'interval' => 60,
-//        'display' => 'every minute'
-//    );
-//    return $schedules;
-//}
+add_filter( 'cron_schedules', 'cron_add_6_hours' );
+function cron_add_6_hours( $schedules ) {
+    $schedules['6_hours'] = array(
+        'interval' => 360*6,
+        'display' => 'every 6 hours'
+    );
+    return $schedules;
+}
 //
 //
 //// Creating the job for WP-Cron.
 //// Pay attention, that this job will run only when admin panel is open
 //// ToDo: change it to daily or twice per day
 //
-//add_action( 'wordfence_json_job', 'wordfence_json_check' );
-//
-//if (!wp_next_scheduled('wordfence_json_job')) {
-//    $scheduled_event = wp_schedule_event(time(), 'one_min', 'wordfence_json_job');
-//}
+add_action( 'wordfence_json_job', 'wordfence_json_check' );
+
+if (!wp_next_scheduled('wordfence_json_job')) {
+    $scheduled_event = wp_schedule_event(time(), '6_hours', 'wordfence_json_job');
+}
