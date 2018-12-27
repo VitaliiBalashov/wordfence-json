@@ -1,0 +1,21 @@
+{
+  "summary": {
+    "title": "Wordfence JSON Threat model",
+    "owner": "Vitalii Balashov",
+    "description": "Connector between Wordfence and vulnerability management tools"
+  },
+  "detail": {
+    "contributors": [
+      {
+        "name": "Vitalii Balashov"
+      }
+    ],
+    "diagrams": [
+      {
+        "title": "Overview",
+        "thumbnail": "./public/content/images/thumbnail.jpg",
+        "id": 0
+      }
+    ]
+  }
+}
