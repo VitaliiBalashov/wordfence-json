@@ -4,25 +4,54 @@
  * ToDo: Fill missed fields
 Plugin Name: Wordfence JSON
 Plugin URI: http://URI_Of_Page_Describing_Plugin_and_Updates
-Description: Send Wordfence notifications in JSON to listener of your vulnerability management system
-Version: 1.0
+Description: Sends Wordfence notifications in JSON to listener of your vulnerability management system
+Version: 1.1
 Author: Vitalii_Balashov
-Author URI: http://URI_Of_The_Plugin_Author
+Author URI: mailto://vitalii.balashov@dowjones.com
 License: A "Slug" license name e.g. GPL2
 */
 
 global $wordfence_json_version;
 $wordfence_json_version = "1.0";
 
+$recommendations = array (
+	'checkHowGetIPs' => null, 
+	'checkSpamIP' => null, 
+	'commentBadURL' => "Please, pay your attention and verify that commented URL is safe.", 
+	'configReadable' => "Make sure that all permissions set to prevent reading config files by unauthorized person.", 
+	'coreUnknown' => null, 
+	'database' => null, 
+	'diskSpace' => "Check the disk space immidiately to prevent service crush.", 
+	'wafStatus' => null, 
+	'dnsChange' => null, 
+	'easyPassword' => "Change user's password to stronger.", 
+	'file' => "Review the file content and make a decision: remove or mark as False Positive.", 
+	'geoipSupport' => null, 
+	'knownfile' => null, 
+	'optionBadURL' => null, 
+	'postBadTitle' => null, 
+	'postBadURL' => null, 
+	'publiclyAccessible' => null, 
+	'spamvertizeCheck' => null, 
+	'suspiciousAdminUsers' => null, 
+	'timelimit' => null, 
+	'wfPluginAbandoned' => "Please make sure that plugin is secure. Find live alternatives as Plan B recommended.", 
+	'wfPluginRemoved' => null, 
+	'wfPluginUpgrade' => "Update plugin to the latest version", 
+	'wfPluginVulnerable' => "To fix security issue update plugin to he latest version. In case of no security updates from plugin author, contact to product security team.", 
+	'wfThemeUpgrade' => "Update Theme to the latest version.", 
+	'wfUpgrade' => "Update Wordfence to latest version.", 
+	'wpscan_directoryList' => "Disable directory listing by changing webserver configuration.", 
+	'wpscan_fullPathDiscl' => "Remove full path from source code."
+);
 
 $options = array(
 	'wf_table_name' => $wpdb->prefix.'wfissues',
 	'wfJson_table_name' => $wpdb->prefix.'wfJson',
-	'project_name' => 'wordpress',
-	'rp_host' => 'https://secautomation.build.pib.dowjones.io',
+	'project_name' => 'wordpress_prod',
+	'rp_host' => 'https://portal.dowjones.com',
 	'launch' => 'regular_scan',
-	//'endpoint' => 'http://10.207.33.94/monitoring/channel/32701/'
-	'endpoint' => 'https://secautomation.build.pib.dowjones.io/jiraservice/report'
+	'endpoint' => 'https://portal.dowjones.com/jiraservice/report'
 );
 
 function wordfence_json_install() {
@@ -51,7 +80,7 @@ function wordfence_json_install() {
 		$wpdb->insert($wf_json_tablename, array('lastCheck'=>time() - (365*24*60*60)));
 	}
 	//ToDo: add error handling and return something
-}
+};
 
 register_activation_hook(__FILE__,'wordfence_json_install');
 
@@ -99,6 +128,7 @@ function get_issues() {
 
 	global $wpdb;
 	global $options;
+	global $recommendations;
 	$last_check_point = $wpdb->get_var("SELECT lastCheck FROM $options[wfJson_table_name]");
 
 	// Fixing current timestamp to next use.
@@ -109,31 +139,50 @@ function get_issues() {
 	$wpdb->update( $options['wfJson_table_name'], array('lastCheck' => $current_time), array('ID'=>1));
 
     $all_issues = $wpdb->get_results(
-    	"SELECT
- 					time,
- 					lastUpdated, 
- 					type, 
- 					severity, 
- 					shortMsg, 
- 					longMsg 
- 				FROM 
- 					$options[wf_table_name] 
- 				WHERE 
- 					status = 'new' 
- 					AND 
- 					lastUpdated 
- 					BETWEEN $last_check_point AND $current_time"
+    	"SELECT 
+			time, 
+			lastUpdated, 
+			type, 
+			severity, 
+			shortMsg, 
+			longMsg 
+		FROM
+			$options[wf_table_name] 
+		
+	");
+
+	if (!empty($all_issues)) {
+		foreach ($all_issues as $issue) {
+
+			if ($recommendations[$issue->type] == null) {
+				// Debug purpose:
+				$args = array (
+					'to' => "vitalii.balashov@dowjones.com",
+					'subject' => "WF JSON notification",
+					'message' => "Yo, man\n\n\r",
+					'message' => "wfIssuetype without description triggered:\n\r",
+					'message' => $issue->shortMsg."\n\r",
+					'message' => "IssueType: ".$issue->type."\n\r",
+					'message' => $issue->longMsg."\n\r"
 				);
-
-    // Prevent sending empty array
-
-    if (!empty($all_issues)) {
-    	$all_issues = prepare_json($all_issues);
-    	return $all_issues;
-    }
-    else {
-    	return False;
-    }
+				mail($args['to'], $args['subject'], $args['message']);
+			}
+			else {
+				$issue->recommendation = $recommendations[$issue->type];
+			}
+			
+			$original_longMsg = $issue->longMsg;
+			$issue->longMsg = "!!!MARKDOWN_MODE!!!";
+			$issue->longMsg .= "*SUMMARY*\n\r";
+			$issue->longMsg .= $original_longMsg."\n\n\r";
+			$issue->longMsg .= "*INSTANCES*: \n\r";
+			$issue->longMsg .= $_SERVER['HTTP_HOST']."\n\n\r";
+			$issue->longMsg .= "*RECOMMENDATION*\n\r";
+			$issue->longMsg .= $issue->recommendation; // TODO: ask guys to add the field Recommendation
+		}
+		$all_issues = prepare_json($all_issues);
+		return $all_issues;
+	}
 }
 
 function wordfence_json_check() {
@@ -148,7 +197,7 @@ function wordfence_json_check() {
 	global $options;
 
     if ($issues = get_issues()) {
-	    $response = send_new_issues($issues, $options['endpoint']);
+		$response = send_new_issues($issues, $options['endpoint']);
 	    return $response;
     }
      /* ToDo: should the function return something in case of error?
@@ -156,10 +205,7 @@ function wordfence_json_check() {
      */
 
 }
-
-//
-///* debug purpouses, set to daily get value from user
-// * ToDo: this filter should be removed when debugging will be end.
+ 
 // * Plugin can check the new issues daily or twice per day.
 // * To define it we should know, when WP admin panel using by admins/users usually.
 // */
@@ -168,7 +214,7 @@ function wordfence_json_check() {
 add_filter( 'cron_schedules', 'cron_add_6_hours' );
 function cron_add_6_hours( $schedules ) {
     $schedules['6_hours'] = array(
-        'interval' => 360*6,
+        'interval' => 3600*6,
         'display' => 'every 6 hours'
     );
     return $schedules;
